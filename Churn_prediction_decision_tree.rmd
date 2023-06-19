@@ -1,0 +1,99 @@
+---
+title: "SAG player behavior before lapsing"
+author: "Sajad Ghashami)"
+date: '2022-06-20'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readr)
+library(rmarkdown)
+```
+
+## Behavior of players before they become 14 days inactive
+
+
+# First lets look at the data
+
+
+
+```{r table, echo=FALSE}
+Players_behavior <- read_csv("Players.behavior.csv")
+Players_behavior %>% paged_table()
+```
+
+## Distinct number of players
+
+Here you can see the trend for the number of players that were inactive more than 14 days, number of active player and percentage of active to inactive players for each month.
+
+```{r distinct players, echo=FALSE, out.width="100%"}
+summarynumber <- Players_behavior %>% 
+  group_by(APP_NAME, STATUS) %>%
+  summarise(AVG_players_count=round(mean(DISTINCT_PLAYERS),0))
+ggplot(summarynumber, aes(STATUS, AVG_players_count, fill=APP_NAME, label = AVG_players_count))+
+  geom_col()+
+  geom_text()+
+  facet_grid(APP_NAME ~ . ,  scales="free_y")
+```
+
+## Trend Distinct number of players
+
+```{r distinct players trend, echo=FALSE, out.width="100%"}
+wider_players <- Players_behavior %>% 
+  select(APP_NAME, END_MONTH, STATUS, DISTINCT_PLAYERS) %>%
+  pivot_wider(names_from = STATUS, values_from = DISTINCT_PLAYERS) %>%
+  rename(inactive_14_days='14.days.inactive', inactive_more_14_days='More.than.14.days.inactive') %>%
+  mutate(perc_inactive=100*inactive_more_14_days/(active+inactive_more_14_days))  %>%
+  pivot_longer(!c(APP_NAME, END_MONTH), names_to = "Metric", values_to = "Value")
+
+wider_players
+ggplot(wider_players, aes(END_MONTH, Value, color = Metric)) +
+  geom_line()+
+  geom_point()+
+  facet_grid(Metric ~ APP_NAME,  scales="free_y")+
+  scale_color_manual(values=c( "#E69F00", "#56B4E9", "#999999", "black")) +
+  theme(legend.position="bottom")
+```
+
+Note that there is a gap that exists in the plot that might need further investigation as there is no data in that range in the source data.
+
+## AVG daily number of machine by each Player
+
+```{r machine, echo=FALSE, out.width="100%"}
+summarymachine <- Players_behavior %>% 
+  group_by(APP_NAME, STATUS) %>%
+  summarise(AVG_distinct_machine_count=round(mean(AVG_DAILY_DISTINCT_MACHINE),2))
+
+ggplot(summarymachine, aes(STATUS, AVG_distinct_machine_count, fill=APP_NAME, label = AVG_distinct_machine_count))+
+  geom_col()+
+  geom_text()+
+  facet_grid(APP_NAME ~ . ,  scales="free_y")
+```
+
+## AVG daily number of machine by each Player
+
+```{r machine trend, echo=FALSE, out.width="100%"}
+wider_machines <- Players_behavior %>% 
+  select(APP_NAME, END_MONTH, STATUS, AVG_DAILY_DISTINCT_MACHINE) %>%
+  pivot_wider(names_from = STATUS, values_from = AVG_DAILY_DISTINCT_MACHINE) %>%
+  rename(inactive_14_days='14.days.inactive', inactive_more_14_days='More.than.14.days.inactive') %>%
+  mutate(perc_inactive=100*inactive_more_14_days/(active+inactive_more_14_days))  %>%
+  pivot_longer(!c(APP_NAME, END_MONTH), names_to = "Metric", values_to = "Value")
+
+ggplot(wider_machines, aes(END_MONTH, Value, color = Metric)) +
+  geom_line()+
+  geom_point()+
+  facet_grid(Metric ~ APP_NAME,  scales="free_y")+
+  scale_color_manual(values=c( "#E69F00", "#56B4E9", "#999999", "black")) +
+  theme(legend.position="bottom")
+```
+
+```{r}
+library(rpart)
+library(rpart.plot)
+fit <- rpart(STATUS~APP_NAME+AVG_DAILY_SESSION_COUNT+END_MONTH, data = Players_behavior, method = 'class')
+rpart.plot(fit, extra = 106)
+```
+
